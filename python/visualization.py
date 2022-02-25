@@ -87,17 +87,17 @@ def interpolate(y, new_length):
     return z
 
 
-r_filt = dsp.ExpFilter(np.tile(0.01, config.N_PIXELS // 2),
+r_filt = dsp.ExpFilter(np.tile(0.01, config.N_PIXELS),
                        alpha_decay=0.2, alpha_rise=0.99)
-g_filt = dsp.ExpFilter(np.tile(0.01, config.N_PIXELS // 2),
+g_filt = dsp.ExpFilter(np.tile(0.01, config.N_PIXELS),
                        alpha_decay=0.05, alpha_rise=0.3)
-b_filt = dsp.ExpFilter(np.tile(0.01, config.N_PIXELS // 2),
+b_filt = dsp.ExpFilter(np.tile(0.01, config.N_PIXELS),
                        alpha_decay=0.1, alpha_rise=0.5)
-common_mode = dsp.ExpFilter(np.tile(0.01, config.N_PIXELS // 2),
+common_mode = dsp.ExpFilter(np.tile(0.01, config.N_PIXELS),
                        alpha_decay=0.99, alpha_rise=0.01)
-p_filt = dsp.ExpFilter(np.tile(1, (3, config.N_PIXELS // 2)),
+p_filt = dsp.ExpFilter(np.tile(1, (3, config.N_PIXELS)),
                        alpha_decay=0.1, alpha_rise=0.99)
-p = np.tile(1.0, (3, config.N_PIXELS // 2))
+p = np.tile(1.0, (3, config.N_PIXELS))
 gain = dsp.ExpFilter(np.tile(0.01, config.N_FFT_BINS),
                      alpha_decay=0.001, alpha_rise=0.99)
 
@@ -121,7 +121,7 @@ def visualize_scroll(y):
     p[1, 0] = g
     p[2, 0] = b
     # Update the LED strip
-    return np.concatenate((p[:, ::-1], p), axis=1)
+    return p
 
 
 def visualize_energy(y):
@@ -131,9 +131,9 @@ def visualize_energy(y):
     gain.update(y)
     y /= gain.value
     # Scale by the width of the LED strip
-    y *= float((config.N_PIXELS // 2) - 1)
+    y *= float((config.N_PIXELS) - 1)
     # Map color channels according to energy in the different freq bands
-    scale = 0.9
+    scale = 0.8
     r = int(np.mean(y[:len(y) // 3]**scale))
     g = int(np.mean(y[len(y) // 3: 2 * len(y) // 3]**scale))
     b = int(np.mean(y[2 * len(y) // 3:]**scale))
@@ -151,16 +151,16 @@ def visualize_energy(y):
     p[1, :] = gaussian_filter1d(p[1, :], sigma=4.0)
     p[2, :] = gaussian_filter1d(p[2, :], sigma=4.0)
     # Set the new pixel value
-    return np.concatenate((p[:, ::-1], p), axis=1)
+    return np.concatenate((p[:, p.shape[1] // 2::-1], p[:, :p.shape[1] // 2 - 1]), axis=1)
 
 
-_prev_spectrum = np.tile(0.01, config.N_PIXELS // 2)
+_prev_spectrum = np.tile(0.01, config.N_PIXELS)
 
 
 def visualize_spectrum(y):
     """Effect that maps the Mel filterbank frequencies onto the LED strip"""
     global _prev_spectrum
-    y = np.copy(interpolate(y, config.N_PIXELS // 2))
+    y = np.copy(interpolate(y, config.N_PIXELS))
     common_mode.update(y)
     diff = y - _prev_spectrum
     _prev_spectrum = np.copy(y)
@@ -169,9 +169,6 @@ def visualize_spectrum(y):
     g = np.abs(diff)
     b = b_filt.update(np.copy(y))
     # Mirror the color channels for symmetric output
-    r = np.concatenate((r[::-1], r))
-    g = np.concatenate((g[::-1], g))
-    b = np.concatenate((b[::-1], b))
     output = np.array([r, g,b]) * 255
     return output
 
@@ -196,7 +193,7 @@ def microphone_update(audio_samples):
     y_roll[:-1] = y_roll[1:]
     y_roll[-1, :] = np.copy(y)
     y_data = np.concatenate(y_roll, axis=0).astype(np.float32)
-    
+
     vol = np.max(np.abs(y_data))
     if vol < config.MIN_VOLUME_THRESHOLD:
         print('No audio input. Volume below threshold. Volume:', vol)
@@ -234,7 +231,7 @@ def microphone_update(audio_samples):
             b_curve.setData(y=led.pixels[2])
     if config.USE_GUI:
         app.processEvents()
-    
+
     if config.DISPLAY_FPS:
         fps = frames_per_second()
         if time.time() - 0.5 > prev_fps_update:
@@ -248,7 +245,8 @@ samples_per_frame = int(config.MIC_RATE / config.FPS)
 # Array containing the rolling audio sample window
 y_roll = np.random.rand(config.N_ROLLING_HISTORY, samples_per_frame) / 1e16
 
-visualization_effect = visualize_spectrum
+visualization_effect = visualize_scroll
+#visualization_effect = visualize_spectrum
 """Visualization effect to display on the LED strip"""
 
 
@@ -340,7 +338,7 @@ if __name__ == '__main__':
         energy_label.mousePressEvent = energy_click
         scroll_label.mousePressEvent = scroll_click
         spectrum_label.mousePressEvent = spectrum_click
-        energy_click(0)
+        scroll_click(0)
         # Layout
         layout.nextRow()
         layout.addItem(freq_label, colspan=3)
