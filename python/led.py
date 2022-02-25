@@ -70,6 +70,8 @@ def _update_esp8266():
     idx = np.array_split(idx, n_packets)
     for packet_indices in idx:
         m = '' if _is_python_2 else []
+        m.append(1)
+        m.append(2)
         for i in packet_indices:
             if _is_python_2:
                 m += chr(i) + chr(p[0][i]) + chr(p[1][i]) + chr(p[2][i])
@@ -114,7 +116,7 @@ def _update_blinkstick():
         This function updates the LED strip with new values.
     """
     global pixels
-    
+
     # Truncate values and cast to integer
     pixels = np.clip(pixels, 0, 255).astype(int)
     # Optional gamma correction
